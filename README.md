@@ -1,17 +1,30 @@
-# Artist Bible API
+# Artist/Tour Booking OS (Next.js + Prisma)
 
-Backend API for the Artist Bible OS — DirtySnatcha Records.
+This repository now contains a web-based Artist/Tour Booking OS focused on email-driven offers to booking readiness.
 
-## What this does
-Provides a server-side proxy for Claude API calls so the frontend
-can parse booking emails without CORS issues.
+## Implemented scope
+- Next.js App Router + TypeScript scaffold with required pages.
+- Prisma schema covering Artists, Tours, Shows, Lineups, Financials, Marketing readiness, Email threads/messages, Offers, Files, Commissions, Marketing assets, and outbox logs.
+- Basic API endpoints for:
+  - Gmail sync trigger (`POST /api/sync-gmail`)
+  - Offer approval -> show creation/link (`POST /api/offers/:id/approve`)
+  - Marketing requirements update + server-side readiness recompute
+  - Needs-answers reply-in-thread email trigger + outbox logging
+  - AI draft generation with approval-ready MarketingAsset records
+  - Admin import endpoint skeleton
+- Storage abstraction with show workspace prefix generation:
+  `Artists/{ArtistSlug}/Shows/{YYYY-MM-DD}_{City}_{VenueSlug}/`
+- Seed script for admin + roster artists.
 
-## Endpoints
-- `GET /` — health check
-- `POST /api/parse-email` — parse a booking email with Claude AI
+## Notes
+- Gmail/OpenAI/storage providers are integrated behind abstractions and currently stubbed for local development.
+- RBAC helper utilities are included for ADMIN/AGENT/ARTIST access checks.
 
-## Setup on Replit
-1. Import this repo
-2. Click Run
-3. Copy the live URL Replit gives you
-4. Paste it into the Artist Bible app Settings tab
+## Quick start
+```bash
+npm install
+npx prisma generate
+npx prisma migrate deploy
+npm run seed
+npm run dev
+```

@@ -1,0 +1,214 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role { ADMIN AGENT ARTIST }
+enum TourStatus { PLANNING ANNOUNCING LIVE COMPLETED }
+enum ShowStatus { OFFER APPROVED CONTRACTED ANNOUNCED COMPLETED CANCELED OFF }
+enum AnnouncementReadyStatus { READY NOT_READY }
+enum BillingRole { HEADLINER SPECIAL_GUEST SUPPORT OPENER LOCAL_SUPPORT }
+enum DealType { FLAT PERCENT_NET DOOR_SPLIT BAR TIERED MIXED }
+enum RepRole { MANAGER BOOKING_AGENT ARTIST OTHER }
+enum CommissionBasis { PERCENT FIXED NONE }
+enum EmailThreadType { OFFER OUTREACH }
+enum FileObjectType { OFFER CONTRACT RIDER MARKETING OTHER }
+enum OfferStatus { NEW NEGOTIATING APPROVED DECLINED CONTRACTED }
+enum MarketingAssetType { SOCIAL EMAIL PROMOTER_COPY }
+enum MarketingAssetStatus { DRAFT APPROVED SENT }
+enum OnSaleStatus { ON_SALE PRESALE COMING_SOON }
+
+model User {
+  id            String   @id @default(cuid())
+  email         String   @unique
+  name          String?
+  role          Role     @default(AGENT)
+  artistId      String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  artist        Artist?  @relation(fields: [artistId], references: [id])
+  createdAssets MarketingAsset[] @relation("CreatedAssets")
+  outboxLogs    EmailOutboxLog[]
+}
+
+model Artist {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  createdAt   DateTime @default(now())
+  tours       Tour[]
+  shows       Show[]
+  users       User[]
+  offers      Offer[]
+  emailThreads EmailThread[]
+  files       FileObject[]
+}
+
+model Tour {
+  id               String     @id @default(cuid())
+  artistId         String
+  name             String
+  announcementDate DateTime?
+  status           TourStatus @default(PLANNING)
+  artist           Artist     @relation(fields: [artistId], references: [id])
+  shows            Show[]
+}
+
+model Show {
+  id                      String                  @id @default(cuid())
+  tourId                  String?
+  artistId                String
+  date                    DateTime
+  city                    String
+  state                   String?
+  venue                   String
+  status                  ShowStatus              @default(OFFER)
+  announcementReadyStatus AnnouncementReadyStatus @default(NOT_READY)
+  gmailThreadId           String?
+  storagePrefix           String?
+  createdAt               DateTime                @default(now())
+  updatedAt               DateTime                @updatedAt
+  tour                    Tour?                   @relation(fields: [tourId], references: [id])
+  artist                  Artist                  @relation(fields: [artistId], references: [id])
+  lineup                  ShowLineup[]
+  financialTerms          FinancialTerms?
+  marketingRequirements   MarketingRequirements?
+  commissions             ShowCommission[]
+  files                   FileObject[]
+  marketingAssets         MarketingAsset[]
+  outboxLogs              EmailOutboxLog[]
+}
+
+model ShowLineup {
+  id           String     @id @default(cuid())
+  showId       String
+  billingRole  BillingRole
+  artistId     String?
+  artistName   String?
+  billingOrder Int
+  show         Show       @relation(fields: [showId], references: [id])
+}
+
+model FinancialTerms {
+  showId                 String   @id
+  guaranteeAmount        Decimal?
+  dealType               DealType?
+  depositRequired        Boolean  @default(false)
+  depositAmount          Decimal?
+  depositReceivedAmount  Decimal  @default(0)
+  balanceDueAmount       Decimal?
+  balanceDueDate         DateTime?
+  backendJson            Json?
+  show                   Show     @relation(fields: [showId], references: [id])
+}
+
+model MarketingRequirements {
+  showId                String      @id
+  ticketLink            String?
+  onSaleStatus          OnSaleStatus?
+  promoContactEmail     String?
+  ticketReportingEmail  String?
+  flyerApproved         Boolean     @default(false)
+  show                  Show        @relation(fields: [showId], references: [id])
+}
+
+model Rep {
+  id                       String @id @default(cuid())
+  name                     String
+  role                     RepRole
+  defaultCommissionPercent Decimal?
+  commissions              ShowCommission[]
+}
+
+model ShowCommission {
+  id               String           @id @default(cuid())
+  showId           String
+  repId            String
+  basis            CommissionBasis
+  percentValue     Decimal?
+  fixedAmount      Decimal?
+  calculatedAmount Decimal?
+  note             String?
+  show             Show             @relation(fields: [showId], references: [id])
+  rep              Rep              @relation(fields: [repId], references: [id])
+}
+
+model EmailThread {
+  id           String          @id @default(cuid())
+  gmailThreadId String         @unique
+  artistId     String?
+  type         EmailThreadType
+  lastMessageAt DateTime
+  artist       Artist?         @relation(fields: [artistId], references: [id])
+  messages     EmailMessage[]
+}
+
+model EmailMessage {
+  id            String   @id @default(cuid())
+  emailThreadId String
+  gmailMessageId String  @unique
+  fromEmail     String
+  fromName      String?
+  subject       String
+  snippet       String?
+  bodyText      String?
+  bodyHtml      String?
+  receivedAt    DateTime
+  emailThread   EmailThread @relation(fields: [emailThreadId], references: [id])
+}
+
+model FileObject {
+  id          String         @id @default(cuid())
+  showId      String?
+  artistId    String?
+  offerId     String?
+  type        FileObjectType
+  storageKey  String
+  filename    String
+  mimeType    String
+  createdAt   DateTime       @default(now())
+  show        Show?          @relation(fields: [showId], references: [id])
+  artist      Artist?        @relation(fields: [artistId], references: [id])
+  offer       Offer?         @relation(fields: [offerId], references: [id])
+}
+
+model Offer {
+  id                  String      @id @default(cuid())
+  artistId            String
+  gmailThreadId       String      @unique
+  status              OfferStatus @default(NEW)
+  offerPartyName      String?
+  offerPartyEmail     String?
+  forwardedByUserId   String?
+  originalSenderEmail String?
+  createdAt           DateTime    @default(now())
+  updatedAt           DateTime    @updatedAt
+  artist              Artist      @relation(fields: [artistId], references: [id])
+  files               FileObject[]
+}
+
+model MarketingAsset {
+  id              String               @id @default(cuid())
+  showId           String
+  type             MarketingAssetType
+  content          String
+  status           MarketingAssetStatus @default(DRAFT)
+  createdByUserId  String
+  show             Show                @relation(fields: [showId], references: [id])
+  createdBy        User                @relation("CreatedAssets", fields: [createdByUserId], references: [id])
+}
+
+model EmailOutboxLog {
+  id           String   @id @default(cuid())
+  showId       String
+  gmailThreadId String
+  template     String
+  sentAt       DateTime @default(now())
+  sentByUserId String
+  show         Show     @relation(fields: [showId], references: [id])
+  sentBy       User     @relation(fields: [sentByUserId], references: [id])
+}
